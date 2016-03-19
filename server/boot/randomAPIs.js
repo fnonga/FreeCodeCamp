@@ -2,7 +2,7 @@ var Rx = require('rx'),
     async = require('async'),
     moment = require('moment'),
     request = require('request'),
-    debug = require('debug')('freecc:cntr:resources'),
+    debug = require('debug')('fcc:cntr:resources'),
     constantStrings = require('../utils/constantStrings.json'),
     labs = require('../resources/labs.json'),
     testimonials = require('../resources/testimonials.json'),
@@ -26,7 +26,9 @@ module.exports = function(app) {
   router.get('/pmi-acp-agile-project-managers-form', agileProjectManagersForm);
   router.get('/nonprofits', nonprofits);
   router.get('/nonprofits-form', nonprofitsForm);
-  router.get('/unsubscribe/:email', unsubscribe);
+  router.get('/unsubscribe/:email', unsubscribeMonthly);
+  router.get('/unsubscribe-notifications/:email', unsubscribeNotifications);
+  router.get('/unsubscribe-quincy/:email', unsubscribeQuincy);
   router.get('/unsubscribed', unsubscribed);
   router.get('/get-started', getStarted);
   router.get('/submit-cat-photo', submitCatPhoto);
@@ -38,6 +40,7 @@ module.exports = function(app) {
   router.get('/all-stories', showAllTestimonials);
   router.get('/terms', terms);
   router.get('/privacy', privacy);
+  router.get('/how-nonprofit-projects-work', howNonprofitProjectsWork);
   router.get('/code-of-conduct', codeOfConduct);
   router.get('/academic-honesty', academicHonesty);
 
@@ -145,7 +148,7 @@ module.exports = function(app) {
         if (err) {
           return next(err);
         }
-        process.nextTick(function() {
+        return process.nextTick(function() {
           res.header('Content-Type', 'application/xml');
           res.render('resources/sitemap', {
             appUrl: appUrl,
@@ -180,6 +183,12 @@ module.exports = function(app) {
   function privacy(req, res) {
       res.render('resources/privacy', {
           title: 'Privacy policy'
+      });
+  }
+
+  function howNonprofitProjectsWork(req, res) {
+      res.render('resources/how-nonprofit-projects-work', {
+          title: 'How our nonprofit projects work'
       });
   }
 
@@ -227,14 +236,18 @@ module.exports = function(app) {
   }
 
   function confirmStickers(req, res) {
-      req.flash('success', { msg: 'Thank you for supporting our community! You should receive your stickers in the ' +
-        'mail soon!'});
-      res.redirect('/shop');
+    req.flash('success', {
+      msg: 'Thank you for supporting our community! You should receive ' +
+        'your stickers in the mail soon!'
+    });
+    res.redirect('/shop');
   }
 
   function cancelStickers(req, res) {
-      req.flash('info', { msg: 'You\'ve cancelled your purchase of our stickers. You can '
-        + 'support our community any time by buying some.'});
+      req.flash('info', {
+        msg: 'You\'ve cancelled your purchase of our stickers. You can ' +
+          'support our community any time by buying some.'
+      });
       res.redirect('/shop');
   }
   function submitCatPhoto(req, res) {
@@ -272,27 +285,48 @@ module.exports = function(app) {
   }
 
   function twitch(req, res) {
-    res.render('resources/twitch', {
-      title: 'Watch us code on Twitch.tv and LiveCoding.tv'
+    res.redirect('https://twitch.tv/freecodecamp');
+  }
+
+  function unsubscribeMonthly(req, res, next) {
+    req.checkParams('email', 'Must send a valid email').isEmail();
+    return User.findOne({ where: { email: req.params.email } }, (err, user) => {
+      if (err) { return next(err); }
+      return user.updateAttribute('sendMonthlyEmail', false, (err) => {
+        if (err) { return next(err); }
+        req.flash('info', {
+          msg: 'We\'ve successfully updated your Email preferences.'
+        });
+        return res.redirect('/unsubscribed');
+      });
     });
   }
 
-  function unsubscribe(req, res, next) {
-    User.findOne({ where: { email: req.params.email } }, function(err, user) {
-      if (user) {
-        if (err) {
-          return next(err);
-        }
-        user.sendMonthlyEmail = false;
-        user.save(function() {
-          if (err) {
-            return next(err);
-          }
-          res.redirect('/unsubscribed');
+  function unsubscribeNotifications(req, res, next) {
+    req.checkParams('email', 'Must send a valid email').isEmail();
+    return User.findOne({ where: { email: req.params.email } }, (err, user) => {
+      if (err) { return next(err); }
+      return user.updateAttribute('sendNotificationEmail', false, (err) => {
+        if (err) { return next(err); }
+        req.flash('info', {
+          msg: 'We\'ve successfully updated your Email preferences.'
         });
-      } else {
-        res.redirect('/unsubscribed');
-      }
+        return res.redirect('/unsubscribed');
+      });
+    });
+  }
+
+  function unsubscribeQuincy(req, res, next) {
+    req.checkParams('email', 'Must send a valid email').isEmail();
+    return User.findOne({ where: { email: req.params.email } }, (err, user) => {
+      if (err) { return next(err); }
+      return user.updateAttribute('sendQuincyEmail', false, (err) => {
+        if (err) { return next(err); }
+        req.flash('info', {
+          msg: 'We\'ve successfully updated your Email preferences.'
+        });
+        return res.redirect('/unsubscribed');
+      });
     });
   }
 
@@ -330,7 +364,7 @@ module.exports = function(app) {
           Object.keys(JSON.parse(pulls)).length :
           'Can\'t connect to github';
 
-        request(
+        return request(
           [
             'https://api.github.com/repos/freecodecamp/',
             'freecodecamp/issues?client_id=',
@@ -344,7 +378,7 @@ module.exports = function(app) {
             issues = ((pulls === parseInt(pulls, 10)) && issues) ?
             Object.keys(JSON.parse(issues)).length - pulls :
               "Can't connect to GitHub";
-            res.send({
+            return res.send({
               issues: issues,
               pulls: pulls
             });
@@ -364,7 +398,7 @@ module.exports = function(app) {
           (JSON.parse(trello)) :
           'Can\'t connect to to Trello';
 
-        res.end(JSON.stringify(trello));
+        return res.end(JSON.stringify(trello));
       });
   }
 
@@ -379,7 +413,7 @@ module.exports = function(app) {
         blog = (status && status.statusCode === 200) ?
           JSON.parse(blog) :
           'Can\'t connect to Blogger';
-        res.end(JSON.stringify(blog));
+        return res.end(JSON.stringify(blog));
       }
     );
   }

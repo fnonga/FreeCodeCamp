@@ -19,7 +19,7 @@ import {
   calcLongestStreak
 } from '../utils/user-stats';
 
-const debug = debugFactory('freecc:boot:user');
+const debug = debugFactory('fcc:boot:user');
 const sendNonUserToMap = ifNoUserRedirectTo('/map');
 const certIds = {
   [certTypes.frontEnd]: frontEndChallengeId,
@@ -153,6 +153,21 @@ module.exports = function(app) {
     sendNonUserToMap,
     toggleLockdownMode
   );
+  router.get(
+    '/toggle-announcement-email-mode',
+    sendNonUserToMap,
+    toggleReceivesAnnouncementEmails
+  );
+  router.get(
+    '/toggle-notification-email-mode',
+    sendNonUserToMap,
+    toggleReceivesNotificationEmails
+  );
+  router.get(
+    '/toggle-quincy-email-mode',
+    sendNonUserToMap,
+    toggleReceivesQuincyEmails
+  );
   router.post(
     '/account/delete',
     ifNoUser401,
@@ -162,6 +177,11 @@ module.exports = function(app) {
     '/account',
     sendNonUserToMap,
     getAccount
+  );
+  router.get(
+    '/settings',
+    sendNonUserToMap,
+    getSettings
   );
   router.get('/vote1', vote1);
   router.get('/vote2', vote2);
@@ -195,7 +215,7 @@ module.exports = function(app) {
     if (req.user) {
       return res.redirect('/');
     }
-    res.render('account/signin', {
+    return res.render('account/signin', {
       title: 'Sign in to Free Code Camp using a Social Media Account'
     });
   }
@@ -209,7 +229,7 @@ module.exports = function(app) {
     if (req.user) {
       return res.redirect('/');
     }
-    res.render('account/email-signin', {
+    return res.render('account/email-signin', {
       title: 'Sign in to Free Code Camp using your Email Address'
     });
   }
@@ -218,7 +238,7 @@ module.exports = function(app) {
     if (req.user) {
       return res.redirect('/');
     }
-    res.render('account/email-signup', {
+    return res.render('account/email-signup', {
       title: 'Sign up for Free Code Camp using your Email Address'
     });
   }
@@ -226,6 +246,12 @@ module.exports = function(app) {
   function getAccount(req, res) {
     const { username } = req.user;
     return res.redirect('/' + username);
+  }
+
+  function getSettings(req, res) {
+    res.render('account/settings', {
+        title: 'Settings'
+    });
   }
 
   function returnUser(req, res, next) {
@@ -326,7 +352,7 @@ module.exports = function(app) {
         user => {
           if (!user) {
             req.flash('errors', {
-              msg: `We couldn't find the user with the username ${username}`
+              msg: `We couldn't find a user with the username ${username}`
             });
             return res.redirect('/');
           }
@@ -387,40 +413,69 @@ module.exports = function(app) {
           req.flash('errors', {
             msg: `Looks like user ${username} is not ${certText[certType]}`
           });
-          res.redirect('back');
+          return res.redirect('back');
         },
         next
       );
   }
 
   function toggleLockdownMode(req, res, next) {
-    if (req.user.isLocked === true) {
-      req.user.isLocked = false;
-      return req.user.save(function(err) {
-        if (err) { return next(err); }
-
-        req.flash('success', {
-          msg: dedent`
-            Other people can now view all your challenge solutions.
-            You can change this back at any time in the "Manage My Account"
-            section at the bottom of this page.
-          `
-        });
-        res.redirect('/' + req.user.username);
-      });
-    }
-    req.user.isLocked = true;
-    return req.user.save(function(err) {
+    return User.findById(req.accessToken.userId, function(err, user) {
       if (err) { return next(err); }
-
-      req.flash('success', {
-        msg: dedent`
-          All your challenge solutions are now hidden from other people.
-          You can change this back at any time in the "Manage My Account"
-          section at the bottom of this page.
-        `
+      return user.updateAttribute('isLocked', !user.isLocked, function(err) {
+        if (err) { return next(err); }
+        req.flash('info', {
+          msg: 'We\'ve successfully updated your Privacy preferences.'
+        });
+        return res.redirect('/settings');
       });
-      res.redirect('/' + req.user.username);
+    });
+  }
+
+  function toggleReceivesAnnouncementEmails(req, res, next) {
+    return User.findById(req.accessToken.userId, function(err, user) {
+      if (err) { return next(err); }
+      return user.updateAttribute(
+        'sendMonthlyEmail',
+        !user.sendMonthlyEmail,
+        (err) => {
+          if (err) { return next(err); }
+          req.flash('info', {
+            msg: 'We\'ve successfully updated your Email preferences.'
+          });
+          return res.redirect('/settings');
+        });
+    });
+  }
+
+  function toggleReceivesQuincyEmails(req, res, next) {
+    return User.findById(req.accessToken.userId, function(err, user) {
+      if (err) { return next(err); }
+      return user.updateAttribute('sendQuincyEmail', !user.sendQuincyEmail,
+        (err) => {
+          if (err) { return next(err); }
+          req.flash('info', {
+            msg: 'We\'ve successfully updated your Email preferences.'
+          });
+          return res.redirect('/settings');
+        }
+      );
+    });
+  }
+
+  function toggleReceivesNotificationEmails(req, res, next) {
+    return User.findById(req.accessToken.userId, function(err, user) {
+      if (err) { return next(err); }
+      return user.updateAttribute(
+        'sendNotificationEmail',
+        !user.sendNotificationEmail,
+        function(err) {
+          if (err) { return next(err); }
+          req.flash('info', {
+            msg: 'We\'ve successfully updated your Email preferences.'
+          });
+          return res.redirect('/settings');
+      });
     });
   }
 
@@ -428,8 +483,8 @@ module.exports = function(app) {
     User.destroyById(req.user.id, function(err) {
       if (err) { return next(err); }
       req.logout();
-      req.flash('info', { msg: 'Your account has been deleted.' });
-      res.redirect('/');
+      req.flash('info', { msg: 'You\'ve successfully deleted your account.' });
+      return res.redirect('/');
     });
   }
 
@@ -438,7 +493,7 @@ module.exports = function(app) {
       req.flash('errors', { msg: 'access token invalid' });
       return res.render('account/forgot');
     }
-    res.render('account/reset', {
+    return res.render('account/reset', {
       title: 'Reset your Password',
       accessToken: req.accessToken.id
     });
@@ -453,14 +508,14 @@ module.exports = function(app) {
       return res.redirect('back');
     }
 
-    User.findById(req.accessToken.userId, function(err, user) {
+    return User.findById(req.accessToken.userId, function(err, user) {
       if (err) { return next(err); }
-      user.updateAttribute('password', password, function(err) {
-      if (err) { return next(err); }
+      return user.updateAttribute('password', password, function(err) {
+        if (err) { return next(err); }
 
         debug('password reset processed successfully');
-        req.flash('info', { msg: 'password reset processed successfully' });
-        res.redirect('/');
+        req.flash('info', { msg: 'You\'ve successfully reset your password.' });
+        return res.redirect('/');
       });
     });
   }
@@ -469,7 +524,7 @@ module.exports = function(app) {
     if (req.isAuthenticated()) {
       return res.redirect('/');
     }
-    res.render('account/forgot', {
+    return res.render('account/forgot', {
       title: 'Forgot Password'
     });
   }
@@ -483,7 +538,7 @@ module.exports = function(app) {
       return res.redirect('/forgot');
     }
 
-    User.resetPassword({
+    return User.resetPassword({
       email: email
     }, function(err) {
       if (err) {
@@ -496,7 +551,7 @@ module.exports = function(app) {
         email +
         ' with further instructions.'
       });
-      res.render('account/forgot');
+      return res.render('account/forgot');
     });
   }
 
@@ -507,7 +562,7 @@ module.exports = function(app) {
         if (err) { return next(err); }
 
         req.flash('success', { msg: 'Thanks for voting!' });
-        res.redirect('/map');
+        return res.redirect('/map');
       });
     } else {
       req.flash('error', { msg: 'You must be signed in to vote.' });
@@ -522,7 +577,7 @@ module.exports = function(app) {
         if (err) { return next(err); }
 
         req.flash('success', { msg: 'Thanks for voting!' });
-        res.redirect('/map');
+        return res.redirect('/map');
       });
     } else {
       req.flash('error', {msg: 'You must be signed in to vote.'});

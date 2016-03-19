@@ -26,7 +26,7 @@ import badIdMap from '../utils/bad-id-map';
 
 const isDev = process.env.NODE_ENV !== 'production';
 const isBeta = !!process.env.BETA;
-const log = debug('freecc:challenges');
+const log = debug('fcc:challenges');
 const challengesRegex = /^(bonfire|waypoint|zipline|basejump|checkpoint)/i;
 const challengeView = {
   0: 'challenges/showHTML',
@@ -120,6 +120,7 @@ function shouldShowNew(element, block) {
     }, 0);
     return newCount / block.length * 100 === 100;
   }
+  return null;
 }
 
 // meant to be used with a filter method
@@ -430,7 +431,7 @@ module.exports = function(app) {
       challengeId = badIdMap[challengeId];
     }
 
-    if (!isMongoId(challengeId)) {
+    if (!isMongoId('' + challengeId)) {
       challengeId = null;
     }
 
@@ -455,7 +456,7 @@ module.exports = function(app) {
       challengeId = badIdMap[challengeId];
     }
 
-    if (!isMongoId(challengeId)) {
+    if (!isMongoId('' + challengeId)) {
       challengeId = null;
     }
 
@@ -514,9 +515,10 @@ module.exports = function(app) {
           }
           var view = challengeView[data.challengeType];
           if (data.id) {
-            res.cookie('currentChallengeId', data.id);
+            res.cookie('currentChallengeId', data.id, {
+              expires: new Date(2147483647000)});
           }
-          res.render(view, data);
+          return res.render(view, data);
         },
         next,
         function() {}
@@ -525,14 +527,12 @@ module.exports = function(app) {
 
   function completedChallenge(req, res, next) {
     req.checkBody('id', 'id must be a ObjectId').isMongoId();
-
     req.checkBody('name', 'name must be at least 3 characters')
       .isString()
       .isLength({ min: 3 });
-
     req.checkBody('challengeType', 'challengeType must be an integer')
-      .isNumber()
-      .isInt();
+      .isNumber();
+
     const type = accepts(req).type('html', 'json', 'text');
 
     const errors = req.validationErrors(true);
@@ -585,7 +585,7 @@ module.exports = function(app) {
               alreadyCompleted
             });
           }
-          res.sendStatus(200);
+          return res.sendStatus(200);
         }
       );
   }
@@ -597,8 +597,7 @@ module.exports = function(app) {
       .isString()
       .isLength({ min: 3 });
     req.checkBody('challengeType', 'must be a number')
-      .isNumber()
-      .isInt();
+      .isNumber();
     req.checkBody('solution', 'solution must be a url').isURL();
 
     const errors = req.validationErrors(true);
@@ -652,7 +651,7 @@ module.exports = function(app) {
               user.progressTimestamps.length + 1
           });
         }
-        res.status(200).send(true);
+        return res.status(200).send(true);
       })
       .subscribe(() => {}, next);
   }

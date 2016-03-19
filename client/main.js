@@ -93,6 +93,7 @@ main = (function(main, global) {
           '<span>Free Code Camp\'s Main Chat</span>' +
         '</div>'
       );
+      return null;
     });
 
 
@@ -233,7 +234,7 @@ $(document).ready(function() {
     };
 
     $('#story-submit').unbind('click');
-    $.post('/stories/', data)
+    return $.post('/stories/', data)
       .fail(function() {
         $('#story-submit').bind('click', storySubmitButtonHandler);
       })
@@ -243,6 +244,7 @@ $(document).ready(function() {
           return null;
         }
         window.location = '/stories/' + storyLink;
+        return null;
       });
   };
 
@@ -296,12 +298,12 @@ $(document).ready(function() {
   }
 
   function expandBlock(item) {
-    $(item).addClass('in').css('height', '100%');
+    $(item).addClass('in').css('height', 'auto');
     expandCaret(item);
   }
 
   function collapseBlock(item) {
-    $(item).removeClass('in').css('height', '100%');
+    $(item).removeClass('in').css('height', 'auto');
     collapseCaret(item);
   }
 
@@ -357,9 +359,9 @@ $(document).ready(function() {
       var mapAside = $('<iframe>');
       mapAside.attr({
         src: '/map-aside',
-        scrolling: 'yes'
+        frameBorder: '0'
       });
-      $('.map-aside .iframeWrapper').append(mapAside);
+      $('.map-aside').append(mapAside);
       main.isMapAsideLoad = true;
     }
     $('.map-aside').removeClass('is-collapsed');
@@ -387,13 +389,13 @@ $(document).ready(function() {
     if (!main.isWikiAsideLoad) {
       var lang = window.location.toString().match(/\/\w{2}\//);
       lang = (lang) ? lang[0] : '/en/';
-      var wikiURL = 'http://freecodecamp.github.io/wiki' + lang;
+      var wikiURL = '//freecodecamp.github.io/wiki' + lang;
       var wikiAside = $('<iframe>');
       wikiAside.attr({
         src: wikiURL,
-        scrolling: 'yes'
+        frameBorder: '0'
       });
-      $('.wiki-aside .iframeWrapper').append(wikiAside);
+      $('.wiki-aside').append(wikiAside);
       main.isWikiAsideLoad = true;
     }
     $('.wiki-aside').removeClass('is-collapsed');
